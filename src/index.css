@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;700&family=Poppins:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#1D1E22] text-gray-300 antialiased;
+  }
+  
+  /* Garante que a textarea e inputs tenham fundo transparente por defeito */
+  textarea, input {
+    @apply bg-transparent;
+  }
+
+  /* --- CORREÇÃO: Estilo da seleção com cantos arredondados --- */
+  /* Estilo de seleção padrão para a maioria dos elementos */
+  *::selection {
+    /* --- ALTERAÇÃO: Garante que o texto seja legível --- */
+    color: white; 
+    background-color: rgb(6 78 59 / 0.6); /* Usando bg-emerald-900 com opacidade */
+    border-radius: 6px;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+
+  /* Estilo de seleção específico para a área de texto principal */
+  textarea::selection {
+    /* Mantém o texto transparente para que a camada de destaque apareça */
+    color: transparent;
+  }
+}
+
+/* --- Estilos Personalizados para a Barra de Rolagem --- */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4a4a4a;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6a6a6a;
+}
+
