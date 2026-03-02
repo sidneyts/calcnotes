@@ -1,4 +1,4 @@
-import { CSSProperties } from 'react';
+
 
 // --- Ícone de Configurações ---
 export const SettingsIcon = ({ className }: { className?: string }) => (
@@ -17,6 +17,8 @@ type SettingsModalProps = {
   setFontFamily: (font: string) => void;
   isCaseSensitive: boolean;
   setIsCaseSensitive: (isSensitive: boolean) => void;
+  showVariablesInFooter: boolean;
+  setShowVariablesInFooter: (show: boolean) => void;
 };
 
 // --- Componente do Modal de Configurações ---
@@ -29,48 +31,118 @@ const SettingsModal = ({
   setFontFamily,
   isCaseSensitive,
   setIsCaseSensitive,
+  showVariablesInFooter,
+  setShowVariablesInFooter,
 }: SettingsModalProps) => {
   const fonts = ['Inter', 'Montserrat', 'Poppins', 'Arial', 'Verdana'];
-  const panelStyle: CSSProperties = {
-    transform: isOpen ? 'translateX(0)' : 'translateX(calc(100% + 1rem))',
-  };
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay Backdrop Blur */}
       <div
         onClick={onClose}
-        className={`fixed inset-0 bg-black transition-opacity duration-300 ${isOpen ? 'bg-opacity-50' : 'bg-opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 bg-black/40 backdrop-blur-sm transition-all duration-300 z-40 ${isOpen ? 'opacity-100 visible' : 'opacity-0 invisible'
+          }`}
       />
-      
-      {/* Painel */}
-      <div style={panelStyle} className="fixed bottom-20 right-4 bg-[#1D1E22] p-6 rounded-lg shadow-xl w-full max-w-sm border border-gray-700 transition-transform duration-300 ease-in-out z-50">
-        <h2 className="text-lg font-bold mb-6 text-gray-300">Configurações</h2>
-        
-        <div className="mb-6">
-          <label htmlFor="fontSize" className="block text-xs font-medium text-gray-400 mb-2">
-            Tamanho da Fonte: {fontSize}px
-          </label>
-          <input id="fontSize" type="range" min="12" max="24" step="1" value={fontSize} onChange={(e) => setFontSize(parseInt(e.target.value, 10))} className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer" />
-        </div>
 
-        <div className="mb-6">
-          <label htmlFor="fontFamily" className="block text-xs font-medium text-gray-400 mb-2">Fonte</label>
-          <select id="fontFamily" value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="w-full p-2 bg-[#2a2b2f] border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
-            {fonts.map((font) => (<option key={font} value={font}>{font}</option>))}
-          </select>
-        </div>
+      {/* Modal Centered Container */}
+      <div
+        className={`fixed inset-0 flex items-center justify-center z-50 pointer-events-none transition-all duration-300 ${isOpen ? 'opacity-100 scale-100 visible' : 'opacity-0 scale-95 invisible'
+          }`}
+      >
+        {/* Modal Janela */}
+        <div
+          className="bg-[#1A1B1E] border border-gray-800 rounded-xl shadow-2xl w-full max-w-[340px] overflow-hidden pointer-events-auto flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800 bg-[#1D1E22]">
+            <h2 className="text-base font-semibold text-gray-200 tracking-wide">Preferências</h2>
+            <button onClick={onClose} className="p-1 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
 
-        <div className="mb-8">
-            <label className="flex items-center justify-between gap-2 cursor-pointer select-none text-sm text-gray-300">
-                Diferenciar Maiúsculas/Minúsculas
-                <div onClick={() => setIsCaseSensitive(!isCaseSensitive)} className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-300 ${isCaseSensitive ? 'bg-emerald-500' : 'bg-gray-600'}`}>
-                    <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-300 ${isCaseSensitive ? 'translate-x-5' : ''}`} />
+          {/* Body */}
+          <div className="p-5 flex flex-col gap-6">
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor="fontSize" className="flex justify-between items-center text-sm font-medium text-gray-400">
+                <span>Tamanho da Fonte</span>
+                <span className="bg-gray-800 text-gray-300 px-2 py-0.5 rounded text-xs">{fontSize}px</span>
+              </label>
+              <input
+                id="fontSize"
+                type="range"
+                min="12" max="32" step="1"
+                value={fontSize}
+                onChange={(e) => setFontSize(parseInt(e.target.value, 10))}
+                className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor="fontFamily" className="text-sm font-medium text-gray-400">Tipo de Fonte</label>
+              <div className="relative">
+                <select
+                  id="fontFamily"
+                  value={fontFamily}
+                  onChange={(e) => setFontFamily(e.target.value)}
+                  className="w-full pl-3 pr-8 py-2 bg-[#25262B] border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:border-emerald-500 appearance-none cursor-pointer transition-colors"
+                >
+                  {fonts.map((font) => (<option key={font} value={font} style={{ fontFamily: font }}>{font}</option>))}
+                </select>
+                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-500">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 </div>
-            </label>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4 mt-1">
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-gray-300 cursor-pointer select-none" onClick={() => setIsCaseSensitive(!isCaseSensitive)}>
+                    Case Sensitive
+                  </label>
+                  <span className="text-xs text-gray-500 mt-0.5">Diferencia Maiúsculas de Minúsculas</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCaseSensitive(!isCaseSensitive)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none transition-colors duration-200 ease-in-out ${isCaseSensitive ? 'bg-emerald-500' : 'bg-gray-700'}`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isCaseSensitive ? 'translate-x-2' : '-translate-x-2'}`}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-gray-300 cursor-pointer select-none" onClick={() => setShowVariablesInFooter(!showVariablesInFooter)}>
+                    Variáveis no Rodapé
+                  </label>
+                  <span className="text-xs text-gray-500 mt-0.5">Mostra os valores atuais na barra inferior</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowVariablesInFooter(!showVariablesInFooter)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none transition-colors duration-200 ease-in-out ${showVariablesInFooter ? 'bg-emerald-500' : 'bg-gray-700'}`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showVariablesInFooter ? 'translate-x-2' : '-translate-x-2'}`}
+                  />
+                </button>
+              </div>
+            </div>
+
+          </div>
+
         </div>
-        
-        <button onClick={onClose} className="w-full bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 transition-colors">Fechar</button>
       </div>
     </>
   );

@@ -7,7 +7,9 @@ declare module '*.svg' {
 
 // Declara a interface para a API do Electron que expomos de forma segura no objeto `window`.
 export interface IElectronAPI {
+  platform: string;
   send: (channel: string, data?: any) => void;
+  onOpenSettings: (callback: () => void) => void;
 }
 
 // Estende a interface global do `Window` para incluir a nossa API `electron`.

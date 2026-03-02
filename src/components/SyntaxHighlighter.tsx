@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 type SyntaxHighlighterProps = {
   text: string;
@@ -28,7 +28,7 @@ const SyntaxHighlighter = ({ text, variables, isCaseSensitive }: SyntaxHighlight
   // Cria a regex para encontrar variáveis, formatação e o resto do texto
   const variableRegex = new RegExp(`\\b(${Array.from(variables).join('|')})\\b`, isCaseSensitive ? 'g' : 'gi');
   const markdownRegex = /(\*\*.*?\*\*|\*.*?\*)/g;
-  
+
   const combinedRegex = new RegExp(`${variableRegex.source}|${markdownRegex.source}`, isCaseSensitive ? 'g' : 'gi');
 
   const parts = text.split(combinedRegex).filter(Boolean);

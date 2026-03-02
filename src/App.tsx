@@ -1,6 +1,7 @@
 import { ChangeEvent, CSSProperties, useEffect, useMemo, useRef, useState, KeyboardEvent, RefObject } from 'react';
 import * as math from 'mathjs';
 import convert, { Unit } from 'convert-units';
+import * as chrono from 'chrono-node';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 import TitleBar from './components/TitleBar';
@@ -29,6 +30,20 @@ const usePersistentState = <T,>(key: string, defaultValue: T): [T, React.Dispatc
 
 const mathInstance = math.create(math.all);
 const mathParser = mathInstance.parser();
+
+// --- Variáveis de Sistema (Moedas e Conectores) ---
+// Preenchemos com 1 como padrão temporário e palavras de apoio
+const DEFAULT_SYSTEM_VARIABLES: Record<string, number> = {
+  em: 1, de: 1, para: 1, hoje: 1,
+  Real: 1, Reais: 1, BRL: 1,
+  Dolar: 1, Dólar: 1, Dolares: 1, Dólares: 1, Dollar: 1, USD: 1,
+  Euro: 1, Euros: 1, EUR: 1,
+  Libra: 1, Libras: 1, GBP: 1,
+  Peso: 1, Pesos: 1, ARS: 1,
+  Bitcoin: 1, Bitcoins: 1, BTC: 1,
+};
+const SYSTEM_VARIABLE_KEYS = new Set(Object.keys(DEFAULT_SYSTEM_VARIABLES).map(k => k.toLowerCase()));
+
 
 // --- Componente EditorPanel ---
 type EditorPanelProps = {
@@ -61,24 +76,25 @@ const EditorPanel = ({
   };
 
   return (
-  <div className="h-full w-full grid grid-cols-1 grid-rows-1">
-    <div 
-      className="col-start-1 row-start-1 py-4 pl-4 pr-6 whitespace-pre-wrap pointer-events-none text-gray-300 select-none overflow-hidden" 
-      style={editorStyle}
-    >
-      <SyntaxHighlighter text={input + '\n'} variables={variablesForHighlight} isCaseSensitive={isCaseSensitive} />
+    <div className="h-full w-full grid grid-cols-1 grid-rows-1">
+      <div
+        className="col-start-1 row-start-1 py-4 pl-8 pr-6 whitespace-pre-wrap pointer-events-none text-gray-300 select-none overflow-hidden"
+        style={editorStyle}
+      >
+        <SyntaxHighlighter text={input + '\n'} variables={variablesForHighlight} isCaseSensitive={isCaseSensitive} />
+      </div>
+      <textarea
+        ref={editorRef}
+        value={input}
+        onChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        className="col-start-1 row-start-1 py-4 pl-8 pr-6 resize-none bg-transparent text-transparent caret-gray-300 focus:outline-none overflow-y-auto"
+        spellCheck="false"
+        style={editorStyle}
+      />
     </div>
-    <textarea 
-      ref={editorRef} 
-      value={input} 
-      onChange={handleInputChange}
-      onKeyDown={handleKeyDown}
-      className="col-start-1 row-start-1 p-4 resize-none bg-transparent text-transparent caret-gray-300 focus:outline-none overflow-y-auto" 
-      spellCheck="false" 
-      style={editorStyle}
-    />
-  </div>
-)};
+  )
+};
 
 
 // --- Componente Principal da Aplicação ---
@@ -87,17 +103,20 @@ function App() {
   const [results, setResults] = useState<ResultEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [numericResultCount, setNumericResultCount] = useState(0);
-  
+
   const [isCalculatorEnabled, setIsCalculatorEnabled] = usePersistentState<boolean>('sidy-calc-enabled', true);
   const [fontSize, setFontSize] = usePersistentState<number>('sidy-font-size', 16);
   const [fontFamily, setFontFamily] = usePersistentState<string>('sidy-font-family', 'Inter');
   const [isCaseSensitive, setIsCaseSensitive] = usePersistentState<boolean>('sidy-case-sensitive', true);
-  
+  const [showVariablesInFooter, setShowVariablesInFooter] = usePersistentState<boolean>('sidy-show-vars', true);
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [variablesForHighlight, setVariablesForHighlight] = useState<Set<string>>(new Set());
+  const [calculatedVariables, setCalculatedVariables] = useState<Record<string, string>>({});
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ ...DEFAULT_SYSTEM_VARIABLES });
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
-  
+
   const { wordCount, charCount } = useMemo(() => {
     const words = input.trim().split(/\s+/).filter(Boolean);
     return {
@@ -106,13 +125,49 @@ function App() {
     };
   }, [input]);
 
+  // Listener para abrir as configurações ao receber o evento pelo Tray Menu
+  useEffect(() => {
+    if (window.electron && window.electron.onOpenSettings) {
+      window.electron.onOpenSettings(() => setIsSettingsOpen(true));
+    }
+  }, []);
+
+  // Busca cotações na inicialização do app
+  useEffect(() => {
+    const fetchRates = async () => {
+      try {
+        const response = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,GBP-BRL,ARS-BRL,BTC-BRL');
+        const data = await response.json();
+
+        setExchangeRates(prev => ({
+          ...prev,
+          Dolar: Number(data.USDBRL.ask), Dólar: Number(data.USDBRL.ask), Dolares: Number(data.USDBRL.ask), Dólares: Number(data.USDBRL.ask), Dollar: Number(data.USDBRL.ask), USD: Number(data.USDBRL.ask),
+          Euro: Number(data.EURBRL.ask), Euros: Number(data.EURBRL.ask), EUR: Number(data.EURBRL.ask),
+          Libra: Number(data.GBPBRL.ask), Libras: Number(data.GBPBRL.ask), GBP: Number(data.GBPBRL.ask),
+          Peso: Number(data.ARSBRL.ask), Pesos: Number(data.ARSBRL.ask), ARS: Number(data.ARSBRL.ask),
+          Bitcoin: Number(data.BTCBRL.ask), Bitcoins: Number(data.BTCBRL.ask), BTC: Number(data.BTCBRL.ask),
+        }));
+      } catch (e) {
+        console.error("Falha ao buscar cotações:", e);
+      }
+    };
+    fetchRates();
+  }, []);
+
   useEffect(() => {
     if (!isCalculatorEnabled) {
-      setResults([]); setTotal(0); setNumericResultCount(0); mathParser.clear(); setVariablesForHighlight(new Set()); return;
+      setResults([]); setTotal(0); setNumericResultCount(0); mathParser.clear(); setVariablesForHighlight(new Set()); setCalculatedVariables({}); return;
     }
 
     const lines = input.split('\n');
     mathParser.clear();
+
+    // Injeta as variáveis de sistema (moedas, conectores) no escopo inicial do mathJs
+    Object.entries(exchangeRates).forEach(([key, val]) => {
+      mathParser.set(key, val);
+      if (!isCaseSensitive) mathParser.set(key.toLowerCase(), val);
+    });
+
     const newResults: ResultEntry[] = [];
     let runningTotal = 0;
     let numericCount = 0;
@@ -123,33 +178,88 @@ function App() {
     lines.forEach(line => {
       let processedLine = line;
       if (line.trim() === '') { newResults.push({ type: 'empty', value: '' }); return; }
-      
+
       // Lógica de case-insensitive
       if (!isCaseSensitive) {
         // Atualiza o mapa com as variáveis já definidas
-        mathParser.scope.forEach((_, key) => {
+        (mathParser as any).scope?.forEach((_: any, key: string) => {
           caseInsensitiveScope.set(key.toLowerCase(), key);
         });
 
         // Substitui variáveis na linha atual
-        processedLine = line.replace(/[a-zA-Z_][a-zA-Z0-9_]*/g, (match) => {
+        processedLine = line.replace(/[a-zA-Zá-úÁ-Ú_][a-zA-Zá-úÁ-Ú0-9_]*/g, (match) => {
           const originalVar = caseInsensitiveScope.get(match.toLowerCase());
           return originalVar || match; // Retorna a variável com a caixa correta ou a original
         });
       }
-      
-      const conversionMatch = processedLine.match(/(\d+\.?\d*)\s*([a-zA-Z]+)\s*(?:in|em)\s*([a-zA-Z]+)/i);
+
+      const conversionMatch = processedLine.match(/(\d+\.?\d*)\s*([a-zA-Zá-úÁ-Ú]+)\s*(?:in|em)\s*([a-zA-Zá-úÁ-Ú]+)/i);
       if (conversionMatch) {
-        try {
-          const [, value, from, to] = conversionMatch;
-          const result = convert(Number(value)).from(from as Unit).to(to as Unit);
-          const formattedResult = mathInstance.format(result, { precision: 14 });
-          newResults.push({ type: 'result', value: formattedResult });
-          runningTotal += result;
-          numericCount++;
-          return;
-        } catch (e) { /* Ignora */ }
+        const [, value, from, to] = conversionMatch;
+        // Se "from" ou "to" for uma moeda conhecida, ignoramos e deixamos pro mathjs
+        if (SYSTEM_VARIABLE_KEYS.has(from.toLowerCase()) || SYSTEM_VARIABLE_KEYS.has(to.toLowerCase())) {
+          // bypass convert-units
+        } else {
+          try {
+            const result = convert(Number(value)).from(from as Unit).to(to as Unit);
+            const formattedResult = mathInstance.format(result, { precision: 14 });
+            newResults.push({ type: 'result', value: formattedResult });
+            runningTotal += result;
+            numericCount++;
+            return;
+          } catch (e) { /* Ignora se convert-units não achar a unidade correspondente */ }
+        }
       }
+      // --- Interceptor de Datas em Linguagem Natural ---
+      const DATE_MATH_PATTERNS: Array<[RegExp, (q: number) => [number, 'day' | 'week' | 'month' | 'year']]> = [
+        [/^(.+?)\s*\+\s*(\d+)\s*(?:dias?|dia)$/i, q => [q, 'day']],
+        [/^(.+?)\s*-\s*(\d+)\s*(?:dias?|dia)$/i, q => [-q, 'day']],
+        [/^(.+?)\s*\+\s*(\d+)\s*(?:semanas?)$/i, q => [q, 'week']],
+        [/^(.+?)\s*-\s*(\d+)\s*(?:semanas?)$/i, q => [-q, 'week']],
+        [/^(.+?)\s*\+\s*(\d+)\s*(?:m[eê]ses?|m[eê]s)$/i, q => [q, 'month']],
+        [/^(.+?)\s*-\s*(\d+)\s*(?:m[eê]ses?|m[eê]s)$/i, q => [-q, 'month']],
+        [/^(.+?)\s*\+\s*(\d+)\s*(?:anos?)$/i, q => [q, 'year']],
+        [/^(.+?)\s*-\s*(\d+)\s*(?:anos?)$/i, q => [-q, 'year']],
+      ];
+      const addToDate = (d: Date, amt: number, unit: 'day' | 'week' | 'month' | 'year') => {
+        const r = new Date(d);
+        if (unit === 'day') r.setDate(r.getDate() + amt);
+        else if (unit === 'week') r.setDate(r.getDate() + amt * 7);
+        else if (unit === 'month') r.setMonth(r.getMonth() + amt);
+        else if (unit === 'year') r.setFullYear(r.getFullYear() + amt);
+        return r;
+      };
+      const fmtDate = (d: Date) =>
+        d.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+      let dateParsed = false;
+      const cleanLine = processedLine.trim();
+
+      // 1. Data + aritmética: "próxima sexta + 2 semanas"
+      for (const [pattern, resolver] of DATE_MATH_PATTERNS) {
+        const dm = cleanLine.match(pattern);
+        if (dm) {
+          const parsedRef = chrono.pt.parseDate(dm[1].trim(), new Date(), { forwardDate: true });
+          if (parsedRef) {
+            const [amt, unit] = resolver(parseInt(dm[2], 10));
+            newResults.push({ type: 'result', value: fmtDate(addToDate(parsedRef, amt, unit)) });
+            dateParsed = true;
+            break;
+          }
+        }
+      }
+
+      // 2. Data simples: "hoje", "amanhã", "próxima sexta"
+      if (!dateParsed && /(?:hoje|amanh[ãa]|ontem|pr[oó]xim|semana|segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado|domingo|jan|feb|mar|abr|mai|jun|jul|ago|set|out|nov|dez)/i.test(cleanLine)) {
+        const simpleDate = chrono.pt.parseDate(cleanLine, new Date(), { forwardDate: true });
+        if (simpleDate) {
+          newResults.push({ type: 'result', value: fmtDate(simpleDate) });
+          dateParsed = true;
+        }
+      }
+
+      if (dateParsed) return;
+
       try {
         const result = mathParser.evaluate(processedLine);
         if (result !== undefined && typeof result !== 'function') {
@@ -171,12 +281,31 @@ function App() {
 
     setResults(newResults);
     setTotal(runningTotal);
-    setNumericResultCount(numericCount); 
+    setNumericResultCount(numericCount);
     const currentScope = (mathParser as any).scope;
     if (currentScope && typeof currentScope.keys === 'function') {
-        setVariablesForHighlight(new Set(currentScope.keys()));
+      setVariablesForHighlight(new Set(currentScope.keys()));
+
+      const vars: Record<string, string> = {};
+      currentScope.forEach((value: any, key: string) => {
+        // Oculta variáveis de sistema predefinidas como 'dolar', 'em', 'real' e ignora não-numéricos
+        if (SYSTEM_VARIABLE_KEYS.has(key.toLowerCase())) return;
+
+        if (typeof value === 'number') {
+          vars[key] = mathInstance.format(value, { precision: 14 });
+        } else if (value && typeof value.toNumber === 'function') {
+          try {
+            vars[key] = mathInstance.format(value.toNumber(), { precision: 14 });
+          } catch (e) {
+            // ignore non-numeric types like functions
+          }
+        }
+      });
+      setCalculatedVariables(vars);
+    } else {
+      setCalculatedVariables({});
     }
-  }, [input, isCalculatorEnabled, isCaseSensitive]);
+  }, [input, isCalculatorEnabled, isCaseSensitive, exchangeRates]);
 
   const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => { setInput(e.target.value); };
 
@@ -187,7 +316,7 @@ function App() {
     const toggleFormatting = (marker: string) => {
       e.preventDefault();
       const value = input;
-      
+
       if (selectionStart === selectionEnd) return;
 
       const prefix = value.substring(selectionStart - marker.length, selectionStart);
@@ -206,9 +335,9 @@ function App() {
         newSelectionStart += marker.length;
         newSelectionEnd += marker.length;
       }
-      
+
       setInput(newText);
-      
+
       setTimeout(() => {
         if (editorRef.current) {
           editorRef.current.focus();
@@ -217,7 +346,7 @@ function App() {
       }, 0);
     };
 
-    if (e.ctrlKey || e.metaKey) { 
+    if (e.ctrlKey || e.metaKey) {
       switch (e.key.toLowerCase()) {
         case 'b':
           toggleFormatting('**');
@@ -230,7 +359,7 @@ function App() {
 
     if (e.key === 'Enter') {
       e.preventDefault();
-      
+
       const currentLineStart = input.lastIndexOf('\n', selectionStart - 1) + 1;
       const currentLine = input.substring(currentLineStart, selectionStart);
       const indentationMatch = currentLine.match(/^\s*/);
@@ -243,9 +372,9 @@ function App() {
 
       setInput(newText);
       const newCursorPos = selectionStart + 1 + indentation.length;
-      
+
       setTimeout(() => {
-        if(editorRef.current) {
+        if (editorRef.current) {
           editorRef.current.focus();
           editorRef.current.setSelectionRange(newCursorPos, newCursorPos);
         }
@@ -253,27 +382,29 @@ function App() {
     }
   };
 
-  const appStyle: CSSProperties = { fontFamily: `${fontFamily}, sans-serif`, fontSize: `${fontSize}px` };
+  const appStyle: CSSProperties = { fontFamily: `${fontFamily}, sans-serif` };
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#1D1E22]" style={appStyle}>
       <TitleBar />
-      <SettingsModal 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
-        fontSize={fontSize} 
-        setFontSize={setFontSize} 
-        fontFamily={fontFamily} 
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        fontSize={fontSize}
+        setFontSize={setFontSize}
+        fontFamily={fontFamily}
         setFontFamily={setFontFamily}
         isCaseSensitive={isCaseSensitive}
         setIsCaseSensitive={setIsCaseSensitive}
+        showVariablesInFooter={showVariablesInFooter}
+        setShowVariablesInFooter={setShowVariablesInFooter}
       />
-      
+
       <main className="flex-grow flex relative overflow-hidden">
         {isCalculatorEnabled ? (
           <PanelGroup direction="horizontal">
             <Panel defaultSize={75} minSize={30}>
-              <EditorPanel 
+              <EditorPanel
                 input={input}
                 handleInputChange={handleInputChange}
                 handleKeyDown={handleKeyDown}
@@ -285,7 +416,7 @@ function App() {
               />
             </Panel>
             <PanelResizeHandle className="w-2 flex items-center justify-center bg-transparent group">
-               <div className="w-px h-full bg-transparent group-hover:bg-gray-700 transition-colors duration-300"></div>
+              <div className="w-px h-full bg-transparent group-hover:bg-gray-700 transition-colors duration-300"></div>
             </PanelResizeHandle>
             <Panel minSize={20}>
               <div className="h-full overflow-y-auto">
@@ -297,7 +428,7 @@ function App() {
           </PanelGroup>
         ) : (
           <div className="w-full h-full">
-            <EditorPanel 
+            <EditorPanel
               input={input}
               handleInputChange={handleInputChange}
               handleKeyDown={handleKeyDown}
@@ -311,8 +442,8 @@ function App() {
         )}
       </main>
 
-      <footer className="h-14 bg-[#1D1E22] flex items-center justify-between px-4 text-sm">
-        <div className="w-1/3">
+      <footer className="h-14 bg-[#1D1E22] flex items-center justify-between px-4 text-sm gap-4">
+        <div className="flex-shrink-0">
           <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-500">
             <div onClick={() => setIsCalculatorEnabled(!isCalculatorEnabled)} className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-300 ${isCalculatorEnabled ? 'bg-emerald-500' : 'bg-gray-600'}`}>
               <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-300 ${isCalculatorEnabled ? 'translate-x-5' : ''}`} />
@@ -321,14 +452,25 @@ function App() {
           </label>
         </div>
 
-        <div className="w-1/3 text-center text-xs text-gray-500 select-none">
+        <div className="flex-1 text-center text-xs text-gray-500 select-none flex items-center justify-center overflow-hidden">
           {isCalculatorEnabled ? (
             <>
-              {numericResultCount > 1 && (
+              {showVariablesInFooter && Object.keys(calculatedVariables).length > 0 ? (
+                <div className="flex gap-4 overflow-x-auto whitespace-nowrap scrollbar-hide px-2 w-full justify-center">
+                  {Object.entries(calculatedVariables).map(([key, value], idx, arr) => (
+                    <span key={key} className="flex items-center gap-4 flex-shrink-0">
+                      <span>
+                        <span className="font-semibold text-gray-400">{key}</span> = {value}
+                      </span>
+                      {idx < arr.length - 1 && <span className="text-gray-700">|</span>}
+                    </span>
+                  ))}
+                </div>
+              ) : numericResultCount > 1 ? (
                 <span className="font-semibold">
                   {mathInstance.format(total, { precision: 14 })}
                 </span>
-              )}
+              ) : null}
             </>
           ) : (
             <div className="flex items-center justify-center gap-4">
@@ -338,7 +480,7 @@ function App() {
           )}
         </div>
 
-        <div className="w-1/3 flex justify-end">
+        <div className="flex-shrink-0 flex justify-end">
           <button onClick={() => setIsSettingsOpen(true)} className="p-2 hover:bg-gray-700 rounded-full">
             <SettingsIcon className="w-5 h-5 text-gray-400" />
           </button>
