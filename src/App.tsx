@@ -55,6 +55,7 @@ type EditorPanelProps = {
   fontSize: number;
   fontFamily: string;
   isCaseSensitive: boolean;
+  isCalculatorEnabled: boolean;
 };
 
 const EditorPanel = ({
@@ -66,6 +67,7 @@ const EditorPanel = ({
   fontSize,
   fontFamily,
   isCaseSensitive,
+  isCalculatorEnabled,
 }: EditorPanelProps) => {
   const editorStyle: CSSProperties = {
     fontFamily: `${fontFamily}, sans-serif`,
@@ -81,7 +83,7 @@ const EditorPanel = ({
         className="col-start-1 row-start-1 py-4 pl-8 pr-6 whitespace-pre-wrap pointer-events-none text-gray-300 select-none overflow-hidden"
         style={editorStyle}
       >
-        <SyntaxHighlighter text={input + '\n'} variables={variablesForHighlight} isCaseSensitive={isCaseSensitive} />
+        <SyntaxHighlighter text={input + '\n'} variables={variablesForHighlight} isCaseSensitive={isCaseSensitive} isCalculatorEnabled={isCalculatorEnabled} />
       </div>
       <textarea
         ref={editorRef}
@@ -346,7 +348,7 @@ function App() {
       }, 0);
     };
 
-    if (e.ctrlKey || e.metaKey) {
+    if ((e.ctrlKey || e.metaKey) && !isCalculatorEnabled) {
       switch (e.key.toLowerCase()) {
         case 'b':
           toggleFormatting('**');
@@ -413,6 +415,7 @@ function App() {
                 fontSize={fontSize}
                 fontFamily={fontFamily}
                 isCaseSensitive={isCaseSensitive}
+                isCalculatorEnabled={isCalculatorEnabled}
               />
             </Panel>
             <PanelResizeHandle className="w-2 flex items-center justify-center bg-transparent group">
@@ -437,6 +440,7 @@ function App() {
               fontSize={fontSize}
               fontFamily={fontFamily}
               isCaseSensitive={isCaseSensitive}
+              isCalculatorEnabled={isCalculatorEnabled}
             />
           </div>
         )}

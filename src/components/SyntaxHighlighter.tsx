@@ -4,11 +4,15 @@ type SyntaxHighlighterProps = {
   text: string;
   variables: Set<string>;
   isCaseSensitive: boolean;
+  isCalculatorEnabled: boolean;
 };
 
-const SyntaxHighlighter = ({ text, variables, isCaseSensitive }: SyntaxHighlighterProps) => {
+const SyntaxHighlighter = ({ text, variables, isCaseSensitive, isCalculatorEnabled }: SyntaxHighlighterProps) => {
   // Se não houver variáveis para destacar, retorna o texto simples
   if (variables.size === 0) {
+    if (isCalculatorEnabled) {
+      return <>{text}</>;
+    }
     const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
     return (
       <>
@@ -29,19 +33,24 @@ const SyntaxHighlighter = ({ text, variables, isCaseSensitive }: SyntaxHighlight
   const variableRegex = new RegExp(`\\b(${Array.from(variables).join('|')})\\b`, isCaseSensitive ? 'g' : 'gi');
   const markdownRegex = /(\*\*.*?\*\*|\*.*?\*)/g;
 
-  const combinedRegex = new RegExp(`${variableRegex.source}|${markdownRegex.source}`, isCaseSensitive ? 'g' : 'gi');
+  const combinedRegexSource = isCalculatorEnabled ? variableRegex.source : `${variableRegex.source}|${markdownRegex.source}`;
+  const combinedRegex = new RegExp(combinedRegexSource, isCaseSensitive ? 'g' : 'gi');
 
   const parts = text.split(combinedRegex).filter(Boolean);
 
   return (
     <>
       {parts.map((part, index) => {
+        if (!part) return null;
+
         // Checa por formatação
-        if (part.startsWith('**') && part.endsWith('**')) {
-          return <strong key={index}>{part.slice(2, -2)}</strong>;
-        }
-        if (part.startsWith('*') && part.endsWith('*')) {
-          return <em key={index}>{part.slice(1, -1)}</em>;
+        if (!isCalculatorEnabled) {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={index}>{part.slice(2, -2)}</strong>;
+          }
+          if (part.startsWith('*') && part.endsWith('*')) {
+            return <em key={index}>{part.slice(1, -1)}</em>;
+          }
         }
 
         // Checa por variáveis
