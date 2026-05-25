@@ -27,3 +27,9 @@ export type ResultEntry = {
   type: ResultType;
   value: string;
 };
+
+export interface Note {
+  id: string;
+  content: string;
+  updatedAt: number;
+}

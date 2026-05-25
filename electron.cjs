@@ -83,7 +83,7 @@ function createTray() {
 
   // Clique esquerdo: Apenas Mostra ou Oculta o aplicativo rapidamente
   tray.on('click', () => {
-    if (mainWindow.isVisible()) {
+    if (mainWindow.isVisible() && mainWindow.isFocused()) {
       mainWindow.hide();
     } else {
       mainWindow.show();

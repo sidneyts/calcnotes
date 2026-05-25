@@ -7,7 +7,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import TitleBar from './components/TitleBar';
 import SettingsModal, { SettingsIcon } from './components/SettingsModal';
 import SyntaxHighlighter from './components/SyntaxHighlighter';
-import { ResultEntry } from './types';
+import { ResultEntry, Note } from './types';
 
 // --- Funções Utilitárias para Persistência ---
 const usePersistentState = <T,>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] => {
@@ -101,7 +101,10 @@ const EditorPanel = ({
 
 // --- Componente Principal da Aplicação ---
 function App() {
-  const [input, setInput] = usePersistentState<string>('sidy-content', '');
+  const [notes, setNotes] = usePersistentState<Note[]>('sidy-notes', []);
+  const [currentNoteId, setCurrentNoteId] = useState<string | null>(null);
+  const [isNotesMenuOpen, setIsNotesMenuOpen] = useState(false);
+
   const [results, setResults] = useState<ResultEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [numericResultCount, setNumericResultCount] = useState(0);
@@ -118,6 +121,46 @@ function App() {
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ ...DEFAULT_SYSTEM_VARIABLES });
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
+
+  // Migration & Initial Load
+  useEffect(() => {
+    let initialNotes = [...notes];
+    
+    // Migração: Se não há notas no novo formato, mas há na chave antiga (sidy-content)
+    if (initialNotes.length === 0) {
+      const oldContentRaw = localStorage.getItem('sidy-content');
+      if (oldContentRaw) {
+        try {
+          const oldContent = JSON.parse(oldContentRaw);
+          if (oldContent && typeof oldContent === 'string' && oldContent.trim() !== '') {
+            const migratedNote: Note = { id: Date.now().toString(), content: oldContent, updatedAt: Date.now() };
+            initialNotes = [migratedNote];
+            setNotes(initialNotes);
+          }
+        } catch (e) {}
+      }
+    }
+    
+    if (initialNotes.length > 0) {
+      initialNotes.sort((a, b) => b.updatedAt - a.updatedAt);
+      if (!currentNoteId) setCurrentNoteId(initialNotes[0].id);
+    } else {
+      const defaultNote: Note = { id: Date.now().toString(), content: '', updatedAt: Date.now() };
+      setNotes([defaultNote]);
+      setCurrentNoteId(defaultNote.id);
+    }
+  }, []);
+
+  const currentNote = notes.find(n => n.id === currentNoteId);
+  const input = currentNote ? currentNote.content : '';
+
+  const updateInput = (newText: string) => {
+    if (currentNoteId) {
+      setNotes(prev => prev.map(n => 
+        n.id === currentNoteId ? { ...n, content: newText, updatedAt: Date.now() } : n
+      ));
+    }
+  };
 
   const { wordCount, charCount } = useMemo(() => {
     const words = input.trim().split(/\s+/).filter(Boolean);
@@ -309,7 +352,7 @@ function App() {
     }
   }, [input, isCalculatorEnabled, isCaseSensitive, exchangeRates]);
 
-  const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => { setInput(e.target.value); };
+  const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => { updateInput(e.target.value); };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     const target = e.currentTarget;
@@ -338,7 +381,7 @@ function App() {
         newSelectionEnd += marker.length;
       }
 
-      setInput(newText);
+      updateInput(newText);
 
       setTimeout(() => {
         if (editorRef.current) {
@@ -372,7 +415,7 @@ function App() {
         '\n' + indentation +
         input.substring(selectionEnd);
 
-      setInput(newText);
+      updateInput(newText);
       const newCursorPos = selectionStart + 1 + indentation.length;
 
       setTimeout(() => {
@@ -388,7 +431,16 @@ function App() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#1D1E22]" style={appStyle}>
-      <TitleBar />
+      <TitleBar 
+        onCreateNote={() => {
+          const newNote: Note = { id: Date.now().toString(), content: '', updatedAt: Date.now() };
+          setNotes(prev => [newNote, ...prev]);
+          setCurrentNoteId(newNote.id);
+          setIsNotesMenuOpen(false);
+          setTimeout(() => editorRef.current?.focus(), 0);
+        }}
+        onToggleMenu={() => setIsNotesMenuOpen(prev => !prev)}
+      />
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -401,6 +453,57 @@ function App() {
         showVariablesInFooter={showVariablesInFooter}
         setShowVariablesInFooter={setShowVariablesInFooter}
       />
+
+      {/* Drawer do Histórico de Notas */}
+      {isNotesMenuOpen && (
+        <div className="absolute top-8 right-0 bottom-14 w-64 bg-[#25262B] border-l border-gray-700 shadow-2xl z-50 flex flex-col">
+          <div className="p-3 border-b border-gray-700 flex justify-between items-center">
+            <h2 className="text-gray-300 font-semibold text-sm">Anotações Recentes</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {[...notes].sort((a, b) => b.updatedAt - a.updatedAt).map(note => (
+              <div 
+                key={note.id} 
+                className={`p-3 border-b border-gray-700/50 cursor-pointer hover:bg-gray-700 transition-colors group flex justify-between items-start ${currentNoteId === note.id ? 'bg-gray-700/50' : ''}`}
+                onClick={() => {
+                  setCurrentNoteId(note.id);
+                  setIsNotesMenuOpen(false);
+                  setTimeout(() => editorRef.current?.focus(), 0);
+                }}
+              >
+                <div className="flex-1 min-w-0 pr-2">
+                  <p className="text-gray-300 text-sm truncate">
+                    {note.content.trim().split('\n')[0] || 'Nova Anotação...'}
+                  </p>
+                  <p className="text-gray-500 text-xs mt-1">
+                    {new Date(note.updatedAt).toLocaleString()}
+                  </p>
+                </div>
+                <button 
+                  className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const newNotes = notes.filter(n => n.id !== note.id);
+                    setNotes(newNotes);
+                    if (currentNoteId === note.id) {
+                      if (newNotes.length > 0) {
+                        setCurrentNoteId(newNotes.sort((a, b) => b.updatedAt - a.updatedAt)[0].id);
+                      } else {
+                        const defaultNote: Note = { id: Date.now().toString(), content: '', updatedAt: Date.now() };
+                        setNotes([defaultNote]);
+                        setCurrentNoteId(defaultNote.id);
+                      }
+                    }
+                  }}
+                  title="Excluir nota"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <main className="flex-grow flex relative overflow-hidden">
         {isCalculatorEnabled ? (
