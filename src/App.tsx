@@ -54,6 +54,7 @@ type EditorPanelProps = {
   variablesForHighlight: Set<string>;
   fontSize: number;
   fontFamily: string;
+  fontWeight: number;
   isCaseSensitive: boolean;
   isCalculatorEnabled: boolean;
 };
@@ -66,12 +67,14 @@ const EditorPanel = ({
   variablesForHighlight,
   fontSize,
   fontFamily,
+  fontWeight,
   isCaseSensitive,
   isCalculatorEnabled,
 }: EditorPanelProps) => {
   const editorStyle: CSSProperties = {
     fontFamily: `${fontFamily}, sans-serif`,
     fontSize: `${fontSize}px`,
+    fontWeight,
     lineHeight: '1.5rem',
     overflowWrap: 'break-word',
     wordBreak: 'break-word',
@@ -112,6 +115,8 @@ function App() {
   const [isCalculatorEnabled, setIsCalculatorEnabled] = usePersistentState<boolean>('sidy-calc-enabled', true);
   const [fontSize, setFontSize] = usePersistentState<number>('sidy-font-size', 16);
   const [fontFamily, setFontFamily] = usePersistentState<string>('sidy-font-family', 'Inter');
+  const [fontWeight, setFontWeight] = usePersistentState<number>('sidy-font-weight', 400);
+  const [isAlwaysOnTop, setIsAlwaysOnTop] = usePersistentState<boolean>('sidy-always-on-top', false);
   const [isCaseSensitive, setIsCaseSensitive] = usePersistentState<boolean>('sidy-case-sensitive', true);
   const [showVariablesInFooter, setShowVariablesInFooter] = usePersistentState<boolean>('sidy-show-vars', true);
 
@@ -121,6 +126,13 @@ function App() {
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ ...DEFAULT_SYSTEM_VARIABLES });
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
+
+  // Sincroniza Always on Top com o processo principal do Electron
+  useEffect(() => {
+    if (window.electron && window.electron.send) {
+      window.electron.send('set-always-on-top', isAlwaysOnTop);
+    }
+  }, [isAlwaysOnTop]);
 
   // Migration & Initial Load
   useEffect(() => {
@@ -448,10 +460,14 @@ function App() {
         setFontSize={setFontSize}
         fontFamily={fontFamily}
         setFontFamily={setFontFamily}
+        fontWeight={fontWeight}
+        setFontWeight={setFontWeight}
         isCaseSensitive={isCaseSensitive}
         setIsCaseSensitive={setIsCaseSensitive}
         showVariablesInFooter={showVariablesInFooter}
         setShowVariablesInFooter={setShowVariablesInFooter}
+        isAlwaysOnTop={isAlwaysOnTop}
+        setIsAlwaysOnTop={setIsAlwaysOnTop}
       />
 
       {/* Drawer do Histórico de Notas */}
@@ -517,6 +533,7 @@ function App() {
                 variablesForHighlight={variablesForHighlight}
                 fontSize={fontSize}
                 fontFamily={fontFamily}
+                fontWeight={fontWeight}
                 isCaseSensitive={isCaseSensitive}
                 isCalculatorEnabled={isCalculatorEnabled}
               />
@@ -542,6 +559,7 @@ function App() {
               variablesForHighlight={variablesForHighlight}
               fontSize={fontSize}
               fontFamily={fontFamily}
+              fontWeight={fontWeight}
               isCaseSensitive={isCaseSensitive}
               isCalculatorEnabled={isCalculatorEnabled}
             />

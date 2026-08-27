@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld('electron', {
   // Função que envia mensagens para o processo principal
   send: (channel, data) => {
     // Lista de canais permitidos para maior segurança
-    const validChannels = ['minimize-window', 'maximize-window', 'close-window'];
+    const validChannels = ['minimize-window', 'maximize-window', 'close-window', 'set-always-on-top'];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, data);
     }

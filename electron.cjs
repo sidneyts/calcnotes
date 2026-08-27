@@ -124,6 +124,12 @@ ipcMain.on('close-window', () => {
   }
 });
 
+ipcMain.on('set-always-on-top', (_event, flag) => {
+  if (mainWindow) {
+    mainWindow.setAlwaysOnTop(Boolean(flag), 'floating');
+  }
+});
+
 app.whenReady().then(() => {
   createWindow();
   createTray();
